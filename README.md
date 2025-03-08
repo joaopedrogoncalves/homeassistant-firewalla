@@ -20,7 +20,7 @@ This custom component integrates your Firewalla device(s) with Home Assistant, a
    - Click on "Integrations"
    - Click the three dots in the top right corner
    - Select "Custom repositories"
-   - Add the URL: `https://github.com/yourusername/homeassistant-firewalla`
+   - Add the URL: `https://github.com/joaopedrogoncalves/homeassistant-firewalla`
    - Select "Integration" as the category
    - Click "Add"
 3. Search for "Firewalla" in HACS integrations
@@ -29,7 +29,7 @@ This custom component integrates your Firewalla device(s) with Home Assistant, a
 
 ### Manual Installation
 
-1. Download the latest release from the [GitHub repository](https://github.com/yourusername/homeassistant-firewalla)
+1. Download the latest release from the [GitHub repository](https://github.com/joaopedrogoncalves/homeassistant-firewalla)
 2. Extract the contents to your Home Assistant config directory under `custom_components/firewalla`
 3. Restart Home Assistant
 
@@ -84,7 +84,7 @@ logger:
 
 If you encounter any issues or have questions, please:
 
-1. Check the [GitHub Issues](https://github.com/yourusername/homeassistant-firewalla/issues) to see if your issue has been reported
+1. Check the [GitHub Issues](https://github.com/joaopedrogoncalves/homeassistant-firewalla/issues) to see if your issue has been reported
 2. If not, create a new issue with detailed information about the problem
 
 ## Contributing
