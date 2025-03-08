@@ -19,6 +19,7 @@ from .const import (
     ATTR_RULE_CREATED_TIME,
     ATTR_RULE_DISABLED,
     ATTR_RULE_ID,
+    ATTR_RULE_NOTES,
     ATTR_RULE_TARGET,
     ATTR_RULE_TYPE,
     DOMAIN,
@@ -101,8 +102,12 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         else:
             # Create a synthetic ID based on other rule properties
             rule_type = rule.get("type", "")
-            rule_target = rule.get("target", "")
-            self.rule_id = f"rule_{rule_type}_{rule_target}".replace(" ", "_").lower()
+            rule_target = rule.get("target", "unknown")
+            if isinstance(rule_target, dict):
+                target_value = rule_target.get("value", "unknown")
+            else:
+                target_value = str(rule_target)
+            self.rule_id = f"rule_{rule_type}_{target_value}".replace(" ", "_").lower()
             _LOGGER.warning("Rule missing ID, created synthetic ID: %s", self.rule_id)
             rule["id"] = self.rule_id
             
@@ -116,14 +121,24 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
             
         self.device_info = device_info
         
-        # Create a unique ID based on the rule ID
+        # Create a unique ID based on the rule ID itself
         # Replace hyphens with underscores for entity ID compatibility
         safe_rule_id = self.rule_id.replace("-", "_")
         self._attr_unique_id = f"{self.device_gid}_{ENTITY_RULE}_{safe_rule_id}"
         
-        # Create a descriptive name based on the rule type, target, and notes
+        # Create a descriptive name based on the rule notes, or type and target
         rule_type = rule.get("type", "unknown")
         rule_target = rule.get("target", "unknown")
+        if isinstance(rule_target, dict):
+            target_value = rule_target.get("value", "unknown")
+            target_type = rule_target.get("type", "")
+            if target_type and target_value:
+                rule_target_str = f"{target_type}: {target_value}"
+            else:
+                rule_target_str = target_value
+        else:
+            rule_target_str = str(rule_target)
+            
         rule_notes = rule.get("notes", "")
         device_name = device_info.get("name", "Firewalla")
         
@@ -131,7 +146,7 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         if rule_notes:
             self._attr_name = f"{device_name} Rule: {rule_notes}"
         else:
-            self._attr_name = f"{device_name} Rule: {rule_type} - {rule_target}"
+            self._attr_name = f"{device_name} Rule: {rule_type} - {rule_target_str}"
         
         # Set device info
         self._attr_device_info = DeviceInfo(
@@ -146,21 +161,31 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if the rule is active (not paused)."""
-        # Find the current rule state in coordinator data
-        if not self.coordinator.data or "rules" not in self.coordinator.data:
-            return False
-            
-        for rule in self.coordinator.data["rules"]:
-            if not isinstance(rule, dict):
-                continue
-                
-            # Check if this is our rule
-            if rule.get("id") == self.rule_id:
-                # Rule is considered "on" when not paused
-                return not rule.get("paused", False)
+        # First, check if there's an updated version of the rule in current data
+        current_rule = None
+        if self.coordinator.data and "rules" in self.coordinator.data:
+            for rule in self.coordinator.data["rules"]:
+                if not isinstance(rule, dict):
+                    continue
+                    
+                if rule.get("id") == self.rule_id:
+                    current_rule = rule
+                    break
         
-        # If rule not found in current data, use the last known state
-        return not self.rule.get("paused", False)
+        if current_rule:
+            # Use the current data if available
+            return not current_rule.get("paused", False)
+        else:
+            # Fall back to the original rule data if not found in current data
+            return not self.rule.get("paused", False)
+            
+    @property
+    def state(self) -> str:
+        """Return the state of the switch."""
+        if self.is_on:
+            return "active"
+        else:
+            return "paused"
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -187,7 +212,12 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
             ATTR_RULE_TARGET: current_rule.get("target", "unknown"),
             ATTR_RULE_ACTION: current_rule.get("action", "unknown"),
             ATTR_RULE_DISABLED: current_rule.get("disabled", False),
+            "status": "active" if not current_rule.get("paused", False) else "paused",
         }
+        
+        # Add notes if available
+        if "notes" in current_rule and current_rule["notes"]:
+            attributes[ATTR_RULE_NOTES] = current_rule["notes"]
         
         if "createdAt" in current_rule:
             attributes[ATTR_RULE_CREATED_TIME] = current_rule["createdAt"]
@@ -196,13 +226,51 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the switch (resume the rule)."""
-        await self.coordinator.api.resume_rule(self.rule_id)
-        await self.coordinator.async_request_refresh()
+        _LOGGER.debug("Resuming rule: %s", self.rule_id)
+        success = await self.coordinator.api.resume_rule(self.rule_id)
+        
+        if success:
+            # Update local state immediately for faster UI feedback
+            if self.coordinator.data and "rules" in self.coordinator.data:
+                for rule in self.coordinator.data["rules"]:
+                    if isinstance(rule, dict) and rule.get("id") == self.rule_id:
+                        rule["paused"] = False
+                        break
+            
+            # Also update our cached rule
+            self.rule["paused"] = False
+            
+            # Force state update
+            self.async_write_ha_state()
+            
+            # Then refresh data from API
+            await self.coordinator.async_request_refresh()
+        else:
+            _LOGGER.error("Failed to resume rule: %s", self.rule_id)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the switch (pause the rule)."""
-        await self.coordinator.api.pause_rule(self.rule_id)
-        await self.coordinator.async_request_refresh()
+        _LOGGER.debug("Pausing rule: %s", self.rule_id)
+        success = await self.coordinator.api.pause_rule(self.rule_id)
+        
+        if success:
+            # Update local state immediately for faster UI feedback
+            if self.coordinator.data and "rules" in self.coordinator.data:
+                for rule in self.coordinator.data["rules"]:
+                    if isinstance(rule, dict) and rule.get("id") == self.rule_id:
+                        rule["paused"] = True
+                        break
+            
+            # Also update our cached rule
+            self.rule["paused"] = True
+            
+            # Force state update
+            self.async_write_ha_state()
+            
+            # Then refresh data from API
+            await self.coordinator.async_request_refresh()
+        else:
+            _LOGGER.error("Failed to pause rule: %s", self.rule_id)
 
     @property
     def available(self) -> bool:
