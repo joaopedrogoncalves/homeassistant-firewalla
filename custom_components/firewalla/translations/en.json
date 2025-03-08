@@ -1,0 +1,41 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Firewalla",
+        "description": "Set up Firewalla integration. You need your MSP domain and personal access token.",
+        "data": {
+          "host": "MSP Domain (e.g., api.firewalla.com)",
+          "api_key": "API Token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Please check your domain and API token.",
+      "no_devices_found": "No Firewalla devices found for this account.",
+      "invalid_auth": "Invalid authentication credentials.",
+      "unknown": "Unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This Firewalla device is already configured."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "online": {
+        "name": "Online"
+      }
+    },
+    "sensor": {
+      "device_count": {
+        "name": "Device Count"
+      },
+      "rule_count": {
+        "name": "Rule Count"
+      },
+      "alarm_count": {
+        "name": "Alarm Count"
+      }
+    }
+  }
+}
