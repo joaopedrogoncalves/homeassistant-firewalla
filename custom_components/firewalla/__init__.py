@@ -1,7 +1,7 @@
 """
 Home Assistant integration for Firewalla devices.
 For more information about this integration, please visit:
-https://github.com/yourusername/homeassistant-firewalla
+https://github.com/joaopedrogoncalves/homeassistant-firewalla
 """
 import logging
 import asyncio
@@ -26,7 +26,7 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
-from .const import DOMAIN, FIREWALLA_COORDINATOR
+from .const import DOMAIN, FIREWALLA_COORDINATOR, SERVICE_PAUSE_RULE, SERVICE_RESUME_RULE
 
 _LOGGER = logging.getLogger(__name__)
 
