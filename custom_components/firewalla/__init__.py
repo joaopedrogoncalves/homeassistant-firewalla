@@ -1,7 +1,7 @@
 """
 Home Assistant integration for Firewalla devices.
 For more information about this integration, please visit:
-https://github.com/yourusername/homeassistant-firewalla
+https://github.com/joaopedrogoncalves/homeassistant-firewalla
 """
 import logging
 import asyncio
@@ -175,12 +175,18 @@ class FirewallaAPI:
                 data = await response.json()
                 _LOGGER.debug("Rules API response for device %s: %s", device_gid, data)
                 
-                # Ensure we have a list of dictionaries
-                if not isinstance(data, list):
-                    _LOGGER.error("Expected list of rules but got: %s", type(data))
+                # Handle both list and dictionary responses
+                if isinstance(data, dict) and "rules" in data:
+                    # If it's a dictionary with a 'rules' key, use that
+                    rules = data.get("rules", [])
+                    _LOGGER.debug("Extracted rules from dictionary: %s", rules)
+                    return rules
+                elif isinstance(data, list):
+                    # If it's already a list, use it directly
+                    return data
+                else:
+                    _LOGGER.error("Unexpected rules data format: %s", type(data))
                     return []
-                    
-                return data
         except Exception as ex:
             _LOGGER.error("Exception in get_rules: %s", ex)
             return []

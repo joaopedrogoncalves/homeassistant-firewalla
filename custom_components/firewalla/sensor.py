@@ -1,6 +1,7 @@
 """Sensor platform for Firewalla integration."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -32,6 +33,8 @@ from .const import (
     FIREWALLA_COORDINATOR,
 )
 
+_LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -42,34 +45,47 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][entry.entry_id][FIREWALLA_COORDINATOR]
     
     if not coordinator.data or "devices" not in coordinator.data:
+        _LOGGER.error("No devices data available in coordinator")
         return
     
     entities = []
     
+    # Log the data structure for debugging
+    _LOGGER.debug("Devices data structure: %s", coordinator.data["devices"])
+    
     for device_data in coordinator.data["devices"]:
-        # Add device count sensor
-        entities.append(
-            FirewallaDeviceCountSensor(
-                coordinator=coordinator,
-                device_data=device_data,
+        # Ensure device_data is a dictionary
+        if not isinstance(device_data, dict):
+            _LOGGER.error("Unexpected device data format: %s", type(device_data))
+            continue
+            
+        try:
+            # Add device count sensor
+            entities.append(
+                FirewallaDeviceCountSensor(
+                    coordinator=coordinator,
+                    device_data=device_data,
+                )
             )
-        )
-        
-        # Add rule count sensor
-        entities.append(
-            FirewallaRuleCountSensor(
-                coordinator=coordinator,
-                device_data=device_data,
+            
+            # Add rule count sensor
+            entities.append(
+                FirewallaRuleCountSensor(
+                    coordinator=coordinator,
+                    device_data=device_data,
+                )
             )
-        )
-        
-        # Add alarm count sensor
-        entities.append(
-            FirewallaAlarmCountSensor(
-                coordinator=coordinator,
-                device_data=device_data,
+            
+            # Add alarm count sensor
+            entities.append(
+                FirewallaAlarmCountSensor(
+                    coordinator=coordinator,
+                    device_data=device_data,
+                )
             )
-        )
+        except Exception as ex:
+            _LOGGER.error("Error creating sensor for device %s: %s", 
+                         device_data.get("name", "unknown"), ex)
 
     async_add_entities(entities)
 

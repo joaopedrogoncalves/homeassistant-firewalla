@@ -1,6 +1,7 @@
 """Switch platform for Firewalla integration."""
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from homeassistant.components.switch import SwitchEntity
@@ -24,6 +25,8 @@ from .const import (
     ENTITY_RULE,
     FIREWALLA_COORDINATOR,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(

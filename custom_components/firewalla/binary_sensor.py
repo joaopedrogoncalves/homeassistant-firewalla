@@ -1,6 +1,7 @@
 """Binary sensor platform for Firewalla integration."""
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict
 
 from homeassistant.components.binary_sensor import (
@@ -26,6 +27,8 @@ from .const import (
     ENTITY_ONLINE,
     FIREWALLA_COORDINATOR,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
