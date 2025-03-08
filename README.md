@@ -9,6 +9,8 @@ This custom component integrates your Firewalla device(s) with Home Assistant, a
 - Monitor rule count
 - Track alarm count
 - View device information like model, version, mode, etc.
+- Control (pause/resume) Firewalla rules through Home Assistant
+- Use services to control Firewalla rules programmatically
 
 ## Installation
 
@@ -29,7 +31,7 @@ This custom component integrates your Firewalla device(s) with Home Assistant, a
 
 ### Manual Installation
 
-1. Download the latest release from the [GitHub repository](https://github.com/joaopedrogoncalves/homeassistant-firewalla)
+1. Download the latest release from the [GitHub repository](https://github.com/yourusername/homeassistant-firewalla)
 2. Extract the contents to your Home Assistant config directory under `custom_components/firewalla`
 3. Restart Home Assistant
 
@@ -60,6 +62,32 @@ For each Firewalla device, the following entities will be created:
   - `sensor.firewalla_device_count`: Number of devices connected to your network
   - `sensor.firewalla_rule_count`: Number of rules configured on your Firewalla
   - `sensor.firewalla_alarm_count`: Number of current alarms
+  
+- **Switches**:
+  - A switch entity is created for each active rule in your Firewalla
+  - Switch format: `switch.firewalla_rule_[type]_[target]`
+  - Turning a switch ON resumes the rule
+  - Turning a switch OFF pauses the rule
+  - Each switch includes attributes with details about the rule
+
+## Services
+
+This integration provides services to control Firewalla rules:
+
+- **firewalla.pause_rule**: Pause a specific Firewalla rule
+  - Parameter: `rule_id` - The ID of the rule to pause
+  
+- **firewalla.resume_rule**: Resume a specific Firewalla rule
+  - Parameter: `rule_id` - The ID of the rule to resume
+
+Example service call in YAML:
+```yaml
+service: firewalla.pause_rule
+data:
+  rule_id: 75489c5b-e8e2-4ab8-b0f1-c2558be1e1d2
+```
+
+You can find the rule IDs in the attributes of the switch entities.
 
 ## Troubleshooting
 
@@ -84,7 +112,7 @@ logger:
 
 If you encounter any issues or have questions, please:
 
-1. Check the [GitHub Issues](https://github.com/joaopedrogoncalves/homeassistant-firewalla/issues) to see if your issue has been reported
+1. Check the [GitHub Issues](https://github.com/yourusername/homeassistant-firewalla/issues) to see if your issue has been reported
 2. If not, create a new issue with detailed information about the problem
 
 ## Contributing

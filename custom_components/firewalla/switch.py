@@ -94,8 +94,26 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         """Initialize the switch."""
         super().__init__(coordinator)
         self.rule = rule
-        self.rule_id = rule["id"]
-        self.device_gid = rule["gid"]
+        
+        # Get rule ID, falling back to creating one if missing
+        if "id" in rule:
+            self.rule_id = rule["id"]
+        else:
+            # Create a synthetic ID based on other rule properties
+            rule_type = rule.get("type", "")
+            rule_target = rule.get("target", "")
+            self.rule_id = f"rule_{rule_type}_{rule_target}".replace(" ", "_").lower()
+            _LOGGER.warning("Rule missing ID, created synthetic ID: %s", self.rule_id)
+            rule["id"] = self.rule_id
+            
+        # Get device GID, using the one from device_info if missing in rule
+        if "gid" in rule:
+            self.device_gid = rule["gid"]
+        else:
+            self.device_gid = device_info.get("gid", "unknown")
+            rule["gid"] = self.device_gid
+            _LOGGER.warning("Rule missing GID, using device GID: %s", self.device_gid)
+            
         self.device_info = device_info
         
         # Create a unique ID based on the rule ID
@@ -104,15 +122,16 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         # Create a descriptive name based on the rule type and target
         rule_type = rule.get("type", "unknown")
         rule_target = rule.get("target", "unknown")
-        self._attr_name = f"{device_info['name']} Rule: {rule_type} - {rule_target}"
+        device_name = device_info.get("name", "Firewalla")
+        self._attr_name = f"{device_name} Rule: {rule_type} - {rule_target}"
         
         # Set device info
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.device_gid)},
-            name=device_info["name"],
+            name=device_info.get("name", "Firewalla"),
             manufacturer="Firewalla",
-            model=device_info["model"].capitalize(),
-            sw_version=device_info["version"],
+            model=device_info.get("model", "").capitalize(),
+            sw_version=device_info.get("version", ""),
             configuration_url=f"https://my.firewalla.com/app/box/{self.device_gid}",
         )
 
