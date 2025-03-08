@@ -117,13 +117,21 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         self.device_info = device_info
         
         # Create a unique ID based on the rule ID
-        self._attr_unique_id = f"{self.device_gid}_{ENTITY_RULE}_{self.rule_id}"
+        # Replace hyphens with underscores for entity ID compatibility
+        safe_rule_id = self.rule_id.replace("-", "_")
+        self._attr_unique_id = f"{self.device_gid}_{ENTITY_RULE}_{safe_rule_id}"
         
-        # Create a descriptive name based on the rule type and target
+        # Create a descriptive name based on the rule type, target, and notes
         rule_type = rule.get("type", "unknown")
         rule_target = rule.get("target", "unknown")
+        rule_notes = rule.get("notes", "")
         device_name = device_info.get("name", "Firewalla")
-        self._attr_name = f"{device_name} Rule: {rule_type} - {rule_target}"
+        
+        # Create name with notes if available
+        if rule_notes:
+            self._attr_name = f"{device_name} Rule: {rule_notes}"
+        else:
+            self._attr_name = f"{device_name} Rule: {rule_type} - {rule_target}"
         
         # Set device info
         self._attr_device_info = DeviceInfo(
@@ -139,28 +147,42 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
     def is_on(self) -> bool:
         """Return true if the rule is active (not paused)."""
         # Find the current rule state in coordinator data
+        if not self.coordinator.data or "rules" not in self.coordinator.data:
+            return False
+            
         for rule in self.coordinator.data["rules"]:
-            if rule["id"] == self.rule_id:
+            if not isinstance(rule, dict):
+                continue
+                
+            # Check if this is our rule
+            if rule.get("id") == self.rule_id:
                 # Rule is considered "on" when not paused
                 return not rule.get("paused", False)
-        return False
+        
+        # If rule not found in current data, use the last known state
+        return not self.rule.get("paused", False)
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return additional attributes about the rule."""
         # Find the current rule data
         current_rule = None
-        for rule in self.coordinator.data["rules"]:
-            if rule["id"] == self.rule_id:
-                current_rule = rule
-                break
+        
+        if self.coordinator.data and "rules" in self.coordinator.data:
+            for rule in self.coordinator.data["rules"]:
+                if not isinstance(rule, dict):
+                    continue
+                    
+                if rule.get("id") == self.rule_id:
+                    current_rule = rule
+                    break
                 
         if not current_rule:
-            return {}
+            current_rule = self.rule
             
         attributes = {
-            ATTR_RULE_ID: current_rule["id"],
-            ATTR_GID: current_rule["gid"],
+            ATTR_RULE_ID: current_rule.get("id", "unknown"),
+            ATTR_GID: current_rule.get("gid", "unknown"),
             ATTR_RULE_TYPE: current_rule.get("type", "unknown"),
             ATTR_RULE_TARGET: current_rule.get("target", "unknown"),
             ATTR_RULE_ACTION: current_rule.get("action", "unknown"),
@@ -188,19 +210,23 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         if not self.coordinator.last_update_success:
             return False
             
+        if not self.coordinator.data or "devices" not in self.coordinator.data:
+            return False
+            
         # Check if the device is still available
         device_available = False
         for device in self.coordinator.data["devices"]:
-            if device["gid"] == self.device_gid and device["online"]:
+            if not isinstance(device, dict):
+                continue
+                
+            if device.get("gid") == self.device_gid and device.get("online", False):
                 device_available = True
                 break
                 
         if not device_available:
             return False
             
-        # Check if the rule still exists
-        for rule in self.coordinator.data["rules"]:
-            if rule["id"] == self.rule_id:
-                return True
-                
-        return False
+        # As long as the device is available, consider the rule available too
+        # No need to check if the rule still exists as we want to keep showing it
+        # even if it's temporarily not returned by the API
+        return True

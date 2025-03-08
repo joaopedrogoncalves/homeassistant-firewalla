@@ -235,28 +235,58 @@ class FirewallaAPI:
     async def pause_rule(self, rule_id):
         """Pause a rule."""
         url = f"{self.base_url}/v2/rules/{rule_id}/pause"
-        async with self.session.post(url, headers=self.headers) as response:
-            if response.status != 200:
-                _LOGGER.error(
-                    "Error pausing rule: %s - %s",
-                    response.status,
-                    await response.text(),
-                )
-                return False
-            return True
+        try:
+            async with self.session.post(url, headers=self.headers) as response:
+                response_text = await response.text()
+                _LOGGER.debug("Pause rule response: %s - %s", response.status, response_text)
+                
+                if response.status != 200:
+                    _LOGGER.error(
+                        "Error pausing rule: %s - %s",
+                        response.status,
+                        response_text,
+                    )
+                    return False
+                    
+                # Try to parse the response
+                try:
+                    data = await response.json()
+                    _LOGGER.debug("Pause rule response data: %s", data)
+                    return True
+                except:
+                    # If we can't parse JSON but got a 200, consider it success
+                    return True
+        except Exception as ex:
+            _LOGGER.error("Exception in pause_rule: %s", ex)
+            return False
             
     async def resume_rule(self, rule_id):
         """Resume a rule."""
         url = f"{self.base_url}/v2/rules/{rule_id}/resume"
-        async with self.session.post(url, headers=self.headers) as response:
-            if response.status != 200:
-                _LOGGER.error(
-                    "Error resuming rule: %s - %s",
-                    response.status,
-                    await response.text(),
-                )
-                return False
-            return True
+        try:
+            async with self.session.post(url, headers=self.headers) as response:
+                response_text = await response.text()
+                _LOGGER.debug("Resume rule response: %s - %s", response.status, response_text)
+                
+                if response.status != 200:
+                    _LOGGER.error(
+                        "Error resuming rule: %s - %s",
+                        response.status,
+                        response_text,
+                    )
+                    return False
+                    
+                # Try to parse the response
+                try:
+                    data = await response.json()
+                    _LOGGER.debug("Resume rule response data: %s", data)
+                    return True
+                except:
+                    # If we can't parse JSON but got a 200, consider it success
+                    return True
+        except Exception as ex:
+            _LOGGER.error("Exception in resume_rule: %s", ex)
+            return False
 
 
 class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):

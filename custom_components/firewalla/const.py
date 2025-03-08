@@ -22,6 +22,7 @@ ATTR_RULE_DISABLED = "disabled"
 ATTR_RULE_PAUSED = "paused"
 ATTR_RULE_CREATED_TIME = "created_time"
 ATTR_RULE_UPDATED_TIME = "updated_time"
+ATTR_RULE_NOTES = "notes"
 
 # Entity types
 ENTITY_DEVICE_COUNT = "device_count"
