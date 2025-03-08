@@ -36,16 +36,31 @@ async def async_setup_entry(
     """Set up Firewalla binary sensor entries."""
     coordinator = hass.data[DOMAIN][entry.entry_id][FIREWALLA_COORDINATOR]
     
+    if not coordinator.data or "devices" not in coordinator.data:
+        _LOGGER.error("No devices data available in coordinator")
+        return
+    
     entities = []
     
-    for device_data in coordinator.data:
+    # Log the data structure for debugging
+    _LOGGER.debug("Devices data structure: %s", coordinator.data["devices"])
+    
+    for device_data in coordinator.data["devices"]:
+        # Ensure device_data is a dictionary
+        if not isinstance(device_data, dict):
+            _LOGGER.error("Unexpected device data format: %s", type(device_data))
+            continue
+            
         # Add online status binary sensor
-        entities.append(
-            FirewallaOnlineSensor(
-                coordinator=coordinator,
-                device_data=device_data,
+        try:
+            entities.append(
+                FirewallaOnlineSensor(
+                    coordinator=coordinator,
+                    device_data=device_data,
+                )
             )
-        )
+        except Exception as ex:
+            _LOGGER.error("Error creating FirewallaOnlineSensor: %s", ex)
 
     async_add_entities(entities)
 
@@ -74,7 +89,7 @@ class FirewallaOnlineSensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         """Return true if the Firewalla is online."""
-        for device in self.coordinator.data:
+        for device in self.coordinator.data["devices"]:
             if device["gid"] == self.gid:
                 return device["online"]
         return False
@@ -82,7 +97,7 @@ class FirewallaOnlineSensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return the extra state attributes of the entity."""
-        for device in self.coordinator.data:
+        for device in self.coordinator.data["devices"]:
             if device["gid"] == self.gid:
                 current_data = device
                 break
@@ -108,7 +123,7 @@ class FirewallaOnlineSensor(CoordinatorEntity, BinarySensorEntity):
         if not self.coordinator.last_update_success:
             return False
             
-        for device in self.coordinator.data:
+        for device in self.coordinator.data["devices"]:
             if device["gid"] == self.gid:
                 return True
         return False

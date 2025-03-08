@@ -1,7 +1,7 @@
 """
 Home Assistant integration for Firewalla devices.
 For more information about this integration, please visit:
-https://github.com/joaopedrogoncalves/homeassistant-firewalla
+https://github.com/yourusername/homeassistant-firewalla
 """
 import logging
 import asyncio
@@ -133,15 +133,28 @@ class FirewallaAPI:
     async def get_devices(self):
         """Get Firewalla devices."""
         url = f"{self.base_url}/v2/boxes"
-        async with self.session.get(url, headers=self.headers) as response:
-            if response.status != 200:
-                _LOGGER.error(
-                    "Error getting Firewalla devices: %s - %s",
-                    response.status,
-                    await response.text(),
-                )
-                return None
-            return await response.json()
+        try:
+            async with self.session.get(url, headers=self.headers) as response:
+                if response.status != 200:
+                    _LOGGER.error(
+                        "Error getting Firewalla devices: %s - %s",
+                        response.status,
+                        await response.text(),
+                    )
+                    return None
+                    
+                data = await response.json()
+                _LOGGER.debug("Devices API response: %s", data)
+                
+                # Ensure we have a list of dictionaries
+                if not isinstance(data, list):
+                    _LOGGER.error("Expected list of devices but got: %s", type(data))
+                    return []
+                    
+                return data
+        except Exception as ex:
+            _LOGGER.error("Exception in get_devices: %s", ex)
+            return []
             
     async def get_rules(self, device_gid=None):
         """Get rules from Firewalla."""
@@ -149,15 +162,28 @@ class FirewallaAPI:
         if device_gid:
             url = f"{url}?gid={device_gid}"
             
-        async with self.session.get(url, headers=self.headers) as response:
-            if response.status != 200:
-                _LOGGER.error(
-                    "Error getting Firewalla rules: %s - %s",
-                    response.status,
-                    await response.text(),
-                )
-                return None
-            return await response.json()
+        try:
+            async with self.session.get(url, headers=self.headers) as response:
+                if response.status != 200:
+                    _LOGGER.error(
+                        "Error getting Firewalla rules: %s - %s",
+                        response.status,
+                        await response.text(),
+                    )
+                    return None
+                    
+                data = await response.json()
+                _LOGGER.debug("Rules API response for device %s: %s", device_gid, data)
+                
+                # Ensure we have a list of dictionaries
+                if not isinstance(data, list):
+                    _LOGGER.error("Expected list of rules but got: %s", type(data))
+                    return []
+                    
+                return data
+        except Exception as ex:
+            _LOGGER.error("Exception in get_rules: %s", ex)
+            return []
             
     async def pause_rule(self, rule_id):
         """Pause a rule."""
@@ -209,20 +235,33 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
             if not devices:
                 raise UpdateFailed("Failed to fetch Firewalla devices")
                 
+            # Ensure devices is a list of dictionaries
+            if isinstance(devices, str):
+                _LOGGER.error("Received unexpected string response for devices: %s", devices)
+                raise UpdateFailed("Unexpected response format from API")
+                
             self.devices = devices
             
             # Get rules for all devices
-            rules = []
+            all_rules = []
             for device in devices:
-                device_rules = await self.api.get_rules(device["gid"])
+                device_gid = device.get("gid")
+                if not device_gid:
+                    continue
+                    
+                device_rules = await self.api.get_rules(device_gid)
                 if device_rules:
-                    rules.extend(device_rules)
+                    # Ensure rules is a list of dictionaries
+                    if isinstance(device_rules, list):
+                        all_rules.extend(device_rules)
+                    else:
+                        _LOGGER.error("Received unexpected format for rules: %s", type(device_rules))
             
-            self.rules = rules
+            self.rules = all_rules
             
             return {
                 "devices": devices,
-                "rules": rules
+                "rules": all_rules
             }
         except Exception as ex:
             _LOGGER.error("Error updating Firewalla data: %s", ex)

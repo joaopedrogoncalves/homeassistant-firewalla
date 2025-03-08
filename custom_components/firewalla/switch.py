@@ -34,36 +34,50 @@ async def async_setup_entry(
     """Set up Firewalla switch entries."""
     coordinator = hass.data[DOMAIN][entry.entry_id][FIREWALLA_COORDINATOR]
     
-    if not coordinator.data or "rules" not in coordinator.data:
+    if not coordinator.data or "rules" not in coordinator.data or "devices" not in coordinator.data:
+        _LOGGER.error("Missing data in coordinator: %s", coordinator.data.keys() if coordinator.data else "No data")
         return
+    
+    # Log the data structure for debugging
+    _LOGGER.debug("Rules data structure: %s", coordinator.data["rules"])
     
     # Create a mapping of device GIDs to device info
     device_mapping = {}
     for device in coordinator.data["devices"]:
-        device_mapping[device["gid"]] = device
+        if isinstance(device, dict) and "gid" in device:
+            device_mapping[device["gid"]] = device
     
     entities = []
     
     # Create switch entities for each rule
     for rule in coordinator.data["rules"]:
+        # Ensure rule is a dictionary
+        if not isinstance(rule, dict):
+            _LOGGER.error("Unexpected rule data format: %s", type(rule))
+            continue
+            
         # Skip disabled rules
-        if rule.get("disabled", False):
+        if not isinstance(rule, dict) or rule.get("disabled", False):
             continue
             
         # Get the device info for this rule
         device_gid = rule.get("gid")
-        if device_gid not in device_mapping:
+        if not device_gid or device_gid not in device_mapping:
+            _LOGGER.warning("Rule has no device GID or device not found: %s", rule.get("id", "unknown"))
             continue
             
         device_info = device_mapping[device_gid]
         
-        entities.append(
-            FirewallaRuleSwitch(
-                coordinator=coordinator,
-                rule=rule,
-                device_info=device_info,
+        try:
+            entities.append(
+                FirewallaRuleSwitch(
+                    coordinator=coordinator,
+                    rule=rule,
+                    device_info=device_info,
+                )
             )
-        )
+        except Exception as ex:
+            _LOGGER.error("Error creating FirewallaRuleSwitch: %s", ex)
 
     async_add_entities(entities)
 
