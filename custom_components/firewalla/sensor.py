@@ -41,9 +41,12 @@ async def async_setup_entry(
     """Set up Firewalla sensor entries."""
     coordinator = hass.data[DOMAIN][entry.entry_id][FIREWALLA_COORDINATOR]
     
+    if not coordinator.data or "devices" not in coordinator.data:
+        return
+    
     entities = []
     
-    for device_data in coordinator.data:
+    for device_data in coordinator.data["devices"]:
         # Add device count sensor
         entities.append(
             FirewallaDeviceCountSensor(
@@ -91,7 +94,7 @@ class FirewallaBaseSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return the extra state attributes of the entity."""
-        for device in self.coordinator.data:
+        for device in self.coordinator.data["devices"]:
             if device["gid"] == self.gid:
                 current_data = device
                 break
@@ -120,7 +123,7 @@ class FirewallaBaseSensor(CoordinatorEntity, SensorEntity):
         if not self.coordinator.last_update_success:
             return False
             
-        for device in self.coordinator.data:
+        for device in self.coordinator.data["devices"]:
             if device["gid"] == self.gid:
                 return True
         return False
@@ -146,7 +149,7 @@ class FirewallaDeviceCountSensor(FirewallaBaseSensor):
     @property
     def native_value(self) -> int:
         """Return the device count."""
-        for device in self.coordinator.data:
+        for device in self.coordinator.data["devices"]:
             if device["gid"] == self.gid:
                 return device["deviceCount"]
         return 0
@@ -168,7 +171,7 @@ class FirewallaRuleCountSensor(FirewallaBaseSensor):
     @property
     def native_value(self) -> int:
         """Return the rule count."""
-        for device in self.coordinator.data:
+        for device in self.coordinator.data["devices"]:
             if device["gid"] == self.gid:
                 return device["ruleCount"]
         return 0
@@ -190,7 +193,7 @@ class FirewallaAlarmCountSensor(FirewallaBaseSensor):
     @property
     def native_value(self) -> int:
         """Return the alarm count."""
-        for device in self.coordinator.data:
+        for device in self.coordinator.data["devices"]:
             if device["gid"] == self.gid:
                 return device["alarmCount"]
         return 0

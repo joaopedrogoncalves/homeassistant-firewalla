@@ -1,7 +1,7 @@
 """
 Home Assistant integration for Firewalla devices.
 For more information about this integration, please visit:
-https://github.com/joaopedrogoncalves/homeassistant-firewalla
+https://github.com/yourusername/homeassistant-firewalla
 """
 import logging
 import asyncio
@@ -44,7 +44,7 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH]
 
 
 async def async_setup(hass: HomeAssistant, config: dict):
@@ -75,6 +75,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.data[DOMAIN][entry.entry_id] = {
         FIREWALLA_COORDINATOR: coordinator,
     }
+
+    # Register services
+    async def pause_rule(call):
+        """Pause a rule."""
+        rule_id = call.data.get("rule_id")
+        if not rule_id:
+            _LOGGER.error("No rule_id provided to pause_rule service")
+            return
+        
+        await api.pause_rule(rule_id)
+        await coordinator.async_request_refresh()
+    
+    async def resume_rule(call):
+        """Resume a rule."""
+        rule_id = call.data.get("rule_id")
+        if not rule_id:
+            _LOGGER.error("No rule_id provided to resume_rule service")
+            return
+        
+        await api.resume_rule(rule_id)
+        await coordinator.async_request_refresh()
+    
+    # Register the services
+    hass.services.async_register(
+        DOMAIN, SERVICE_PAUSE_RULE, pause_rule, vol.Schema({vol.Required("rule_id"): cv.string})
+    )
+    
+    hass.services.async_register(
+        DOMAIN, SERVICE_RESUME_RULE, resume_rule, vol.Schema({vol.Required("rule_id"): cv.string})
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -112,6 +142,48 @@ class FirewallaAPI:
                 )
                 return None
             return await response.json()
+            
+    async def get_rules(self, device_gid=None):
+        """Get rules from Firewalla."""
+        url = f"{self.base_url}/v2/rules"
+        if device_gid:
+            url = f"{url}?gid={device_gid}"
+            
+        async with self.session.get(url, headers=self.headers) as response:
+            if response.status != 200:
+                _LOGGER.error(
+                    "Error getting Firewalla rules: %s - %s",
+                    response.status,
+                    await response.text(),
+                )
+                return None
+            return await response.json()
+            
+    async def pause_rule(self, rule_id):
+        """Pause a rule."""
+        url = f"{self.base_url}/v2/rules/{rule_id}/pause"
+        async with self.session.post(url, headers=self.headers) as response:
+            if response.status != 200:
+                _LOGGER.error(
+                    "Error pausing rule: %s - %s",
+                    response.status,
+                    await response.text(),
+                )
+                return False
+            return True
+            
+    async def resume_rule(self, rule_id):
+        """Resume a rule."""
+        url = f"{self.base_url}/v2/rules/{rule_id}/resume"
+        async with self.session.post(url, headers=self.headers) as response:
+            if response.status != 200:
+                _LOGGER.error(
+                    "Error resuming rule: %s - %s",
+                    response.status,
+                    await response.text(),
+                )
+                return False
+            return True
 
 
 class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
@@ -126,11 +198,32 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=SCAN_INTERVAL,
         )
         self.api = api
+        self.devices = []
+        self.rules = []
 
     async def _async_update_data(self):
         """Fetch data from Firewalla."""
         try:
-            return await self.api.get_devices()
+            # Get devices
+            devices = await self.api.get_devices()
+            if not devices:
+                raise UpdateFailed("Failed to fetch Firewalla devices")
+                
+            self.devices = devices
+            
+            # Get rules for all devices
+            rules = []
+            for device in devices:
+                device_rules = await self.api.get_rules(device["gid"])
+                if device_rules:
+                    rules.extend(device_rules)
+            
+            self.rules = rules
+            
+            return {
+                "devices": devices,
+                "rules": rules
+            }
         except Exception as ex:
             _LOGGER.error("Error updating Firewalla data: %s", ex)
             raise UpdateFailed(f"Error communicating with Firewalla API: {ex}") from ex

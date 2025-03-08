@@ -36,6 +36,33 @@
       "alarm_count": {
         "name": "Alarm Count"
       }
+    },
+    "switch": {
+      "rule": {
+        "name": "Rule Status"
+      }
+    }
+  },
+  "services": {
+    "pause_rule": {
+      "name": "Pause Rule",
+      "description": "Pauses a Firewalla rule.",
+      "fields": {
+        "rule_id": {
+          "name": "Rule ID",
+          "description": "The ID of the rule to pause."
+        }
+      }
+    },
+    "resume_rule": {
+      "name": "Resume Rule",
+      "description": "Resumes a Firewalla rule.",
+      "fields": {
+        "rule_id": {
+          "name": "Rule ID",
+          "description": "The ID of the rule to resume."
+        }
+      }
     }
   }
 }

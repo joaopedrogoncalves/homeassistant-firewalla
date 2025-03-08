@@ -1,0 +1,25 @@
+# Services for Firewalla integration
+
+pause_rule:
+  name: Pause Rule
+  description: Pauses a Firewalla rule.
+  fields:
+    rule_id:
+      name: Rule ID
+      description: The ID of the rule to pause.
+      required: true
+      example: "75489c5b-e8e2-4ab8-b0f1-c2558be1e1d2"
+      selector:
+        text:
+
+resume_rule:
+  name: Resume Rule
+  description: Resumes a Firewalla rule.
+  fields:
+    rule_id:
+      name: Rule ID
+      description: The ID of the rule to resume.
+      required: true
+      example: "75489c5b-e8e2-4ab8-b0f1-c2558be1e1d2"
+      selector:
+        text:
