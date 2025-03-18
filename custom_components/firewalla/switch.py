@@ -217,6 +217,12 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
             "status": "active" if self.is_on else "paused",
         }
         
+        # Add MSP link to the rule
+        msp_domain = self.coordinator.api.host
+        rule_id = current_rule.get("id", "")
+        if msp_domain and rule_id:
+            attributes["msp_url"] = f"https://{msp_domain}/global/rules?filters={rule_id}"
+        
         # Add action
         if "action" in current_rule:
             attributes[ATTR_RULE_ACTION] = current_rule["action"]
