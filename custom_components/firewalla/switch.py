@@ -264,12 +264,27 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         if "notes" in current_rule and current_rule["notes"]:
             attributes[ATTR_RULE_NOTES] = current_rule["notes"]
             
-        # Add timestamps
-        if "ts" in current_rule:
-            attributes["created_at"] = current_rule["ts"]
-        if "updateTs" in current_rule:
-            attributes["updated_at"] = current_rule["updateTs"]
+        # Add timestamps in ISO 8601 format
+        from datetime import datetime
+        
+        if "ts" in current_rule and current_rule["ts"]:
+            try:
+                created_at = datetime.fromtimestamp(current_rule["ts"]).isoformat()
+                attributes["created_at"] = created_at
+            except (ValueError, TypeError):
+                # Keep original value if conversion fails
+                attributes["created_at"] = current_rule["ts"]
+                
+        if "updateTs" in current_rule and current_rule["updateTs"]:
+            try:
+                updated_at = datetime.fromtimestamp(current_rule["updateTs"]).isoformat()
+                attributes["updated_at"] = updated_at
+            except (ValueError, TypeError):
+                # Keep original value if conversion fails
+                attributes["updated_at"] = current_rule["updateTs"]
+                
         if "createdAt" in current_rule:
+            # This might already be in a different format, so keep as is
             attributes[ATTR_RULE_CREATED_TIME] = current_rule["createdAt"]
             
         return attributes
