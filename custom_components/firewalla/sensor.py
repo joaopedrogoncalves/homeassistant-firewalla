@@ -90,11 +90,12 @@ async def async_setup_entry(
             _LOGGER.error("Error creating sensor for device %s: %s", 
                          device_data.get("name", "unknown"), ex)
 
-    _LOGGER.info("Adding %d sensor entities", len(entities))
+    _LOGGER.info("Adding %d firewalla sensor entities", len(entities))
     async_add_entities(entities)
     
-    # Removing network device sensor setup for now to fix the import error
-    # We'll add it back in a later update when it's working correctly
+    # We'll add network device sensor support once the main functionality is working reliably
+    # This can be re-enabled in a future update
+
 
 
 class FirewallaBaseSensor(CoordinatorEntity, SensorEntity):

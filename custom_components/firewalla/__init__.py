@@ -44,7 +44,7 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH, "network_device_sensor"]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH]
 
 
 async def async_setup(hass: HomeAssistant, config: dict):
@@ -388,6 +388,7 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
             }
             
             # Try to get network devices, but don't fail if this part doesn't work
+            # For now we're just collecting the data, but not creating entities from it
             try:
                 all_network_devices = []
                 for device in devices:
@@ -410,7 +411,8 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
                         if group_id and group_name:
                             self.device_groups[group_id] = group_name
                 
-                # Add network device data to result if available
+                # Add network device data to result if available - just for data collection
+                # We're not creating entities from this data yet
                 result["network_devices"] = all_network_devices
                 result["device_groups"] = self.device_groups
                 
