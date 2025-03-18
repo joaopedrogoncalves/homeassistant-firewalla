@@ -352,7 +352,7 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Fetch data from Firewalla."""
         try:
-            # Get devices
+            # Get devices first - this is critical for all other functionality
             devices = await self.api.get_devices()
             if not devices:
                 raise UpdateFailed("Failed to fetch Firewalla devices")
@@ -364,31 +364,7 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
                 
             self.devices = devices
             
-            # Get network devices
-            all_network_devices = []
-            for device in devices:
-                device_gid = device.get("gid")
-                if not device_gid:
-                    continue
-                    
-                network_devices = await self.api.get_network_devices(device_gid)
-                if network_devices:
-                    all_network_devices.extend(network_devices)
-            
-            self.network_devices = all_network_devices
-            
-            # Build a map of group IDs to group names
-            self.device_groups = {}
-            for device in all_network_devices:
-                if "group" in device and isinstance(device["group"], dict):
-                    group_id = device["group"].get("id")
-                    group_name = device["group"].get("name")
-                    if group_id and group_name:
-                        self.device_groups[group_id] = group_name
-            
-            _LOGGER.debug("Found device groups: %s", self.device_groups)
-            
-            # Get rules for all devices
+            # Get rules for all devices - this is critical for rule switches
             all_rules = []
             for device in devices:
                 device_gid = device.get("gid")
@@ -405,12 +381,46 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
             
             self.rules = all_rules
             
-            return {
+            # Initial data structure with critical components
+            result = {
                 "devices": devices,
                 "rules": all_rules,
-                "network_devices": all_network_devices,
-                "device_groups": self.device_groups
             }
+            
+            # Try to get network devices, but don't fail if this part doesn't work
+            try:
+                all_network_devices = []
+                for device in devices:
+                    device_gid = device.get("gid")
+                    if not device_gid:
+                        continue
+                        
+                    network_devices = await self.api.get_network_devices(device_gid)
+                    if network_devices:
+                        all_network_devices.extend(network_devices)
+                
+                self.network_devices = all_network_devices
+                
+                # Build a map of group IDs to group names
+                self.device_groups = {}
+                for device in all_network_devices:
+                    if "group" in device and isinstance(device["group"], dict):
+                        group_id = device["group"].get("id")
+                        group_name = device["group"].get("name")
+                        if group_id and group_name:
+                            self.device_groups[group_id] = group_name
+                
+                # Add network device data to result if available
+                result["network_devices"] = all_network_devices
+                result["device_groups"] = self.device_groups
+                
+                _LOGGER.debug("Successfully retrieved network devices: %d devices, %d groups", 
+                             len(all_network_devices), len(self.device_groups))
+            except Exception as ex:
+                _LOGGER.warning("Error retrieving network devices, continuing without them: %s", ex)
+                # Don't re-raise - we want to continue even if network devices fail
+            
+            return result
         except Exception as ex:
             _LOGGER.error("Error updating Firewalla data: %s", ex)
             raise UpdateFailed(f"Error communicating with Firewalla API: {ex}") from ex

@@ -38,18 +38,25 @@ async def async_setup_entry(
     """Set up Firewalla switch entries."""
     coordinator = hass.data[DOMAIN][entry.entry_id][FIREWALLA_COORDINATOR]
     
-    if not coordinator.data or "rules" not in coordinator.data or "devices" not in coordinator.data:
-        _LOGGER.error("Missing data in coordinator: %s", coordinator.data.keys() if coordinator.data else "No data")
+    # Ensure we have rules data
+    if not coordinator.data:
+        _LOGGER.error("No coordinator data available")
+        return
+        
+    if "rules" not in coordinator.data:
+        _LOGGER.error("No rules data in coordinator: %s", coordinator.data.keys() if coordinator.data else "No data")
         return
     
     # Log the data structure for debugging
-    _LOGGER.debug("Rules data structure: %s", coordinator.data["rules"])
+    _LOGGER.debug("Rules data available: %d rules", 
+                 len(coordinator.data["rules"]) if isinstance(coordinator.data["rules"], list) else 0)
     
     # Create a mapping of device GIDs to device info
     device_mapping = {}
-    for device in coordinator.data["devices"]:
-        if isinstance(device, dict) and "gid" in device:
-            device_mapping[device["gid"]] = device
+    if "devices" in coordinator.data and isinstance(coordinator.data["devices"], list):
+        for device in coordinator.data["devices"]:
+            if isinstance(device, dict) and "gid" in device:
+                device_mapping[device["gid"]] = device
     
     entities = []
     
@@ -83,6 +90,7 @@ async def async_setup_entry(
         except Exception as ex:
             _LOGGER.error("Error creating FirewallaRuleSwitch: %s", ex)
 
+    _LOGGER.info("Adding %d rule switch entities", len(entities))
     async_add_entities(entities)
 
 
