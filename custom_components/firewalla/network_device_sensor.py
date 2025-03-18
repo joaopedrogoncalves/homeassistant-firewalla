@@ -36,11 +36,16 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Firewalla network device sensors."""
+    _LOGGER.debug("Setting up network device sensors directly")
+    
     coordinator = hass.data[DOMAIN][entry.entry_id][FIREWALLA_COORDINATOR]
     
     if not coordinator.data or "network_devices" not in coordinator.data:
         _LOGGER.warning("No network device data available yet")
         return
+    
+    _LOGGER.debug("Found %d network devices", 
+                 len(coordinator.data["network_devices"]) if isinstance(coordinator.data["network_devices"], list) else 0)
     
     entities = []
     
@@ -55,15 +60,20 @@ async def async_setup_entry(
     for device in coordinator.data["network_devices"]:
         # Ensure device data is a dictionary
         if not isinstance(device, dict):
+            _LOGGER.warning("Network device is not a dictionary: %s", type(device))
             continue
             
         # Skip devices without an ID
         device_id = device.get("id")
         if not device_id:
+            _LOGGER.warning("Network device missing ID")
             continue
+            
+        _LOGGER.debug("Processing network device: %s", device_id)
             
         device_gid = device.get("gid")
         if not device_gid or device_gid not in firewalla_devices:
+            _LOGGER.warning("Network device has invalid GID: %s", device_gid)
             continue
             
         firewalla_device = firewalla_devices[device_gid]
@@ -100,7 +110,12 @@ async def async_setup_entry(
         except Exception as ex:
             _LOGGER.error("Error creating network device sensor: %s - %s", device_id, ex)
     
-    async_add_entities(entities)
+    _LOGGER.debug("Adding %d network device entities", len(entities))
+    if entities:
+        async_add_entities(entities)
+    else:
+        _LOGGER.warning("No network device entities were created")
+
 
 
 class NetworkDeviceBaseSensor(CoordinatorEntity, SensorEntity):
