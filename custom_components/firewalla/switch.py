@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -90,6 +90,8 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
     """Representation of a Firewalla rule switch."""
     
     _attr_icon = "mdi:shield"
+    _attr_device_class = SwitchDeviceClass.SWITCH
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator, rule, device_info):
         """Initialize the switch."""
@@ -173,19 +175,23 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
                     break
         
         if current_rule:
-            # Use the current data if available
+            # Check the status field first (seems to be what the API uses)
+            if "status" in current_rule:
+                rule_status = current_rule["status"]
+                _LOGGER.debug("Rule %s has status: %s", self.rule_id, rule_status)
+                return rule_status != "paused"
+            
+            # Fallback to paused field
             return not current_rule.get("paused", False)
         else:
             # Fall back to the original rule data if not found in current data
+            if "status" in self.rule:
+                rule_status = self.rule["status"]
+                _LOGGER.debug("Using original rule status for %s: %s", self.rule_id, rule_status)
+                return rule_status != "paused"
             return not self.rule.get("paused", False)
             
-    @property
-    def state(self) -> str:
-        """Return the state of the switch."""
-        if self.is_on:
-            return "active"
-        else:
-            return "paused"
+
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -208,17 +214,55 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         attributes = {
             ATTR_RULE_ID: current_rule.get("id", "unknown"),
             ATTR_GID: current_rule.get("gid", "unknown"),
-            ATTR_RULE_TYPE: current_rule.get("type", "unknown"),
-            ATTR_RULE_TARGET: current_rule.get("target", "unknown"),
-            ATTR_RULE_ACTION: current_rule.get("action", "unknown"),
-            ATTR_RULE_DISABLED: current_rule.get("disabled", False),
-            "status": "active" if not current_rule.get("paused", False) else "paused",
+            "status": "active" if self.is_on else "paused",
         }
         
+        # Add action
+        if "action" in current_rule:
+            attributes[ATTR_RULE_ACTION] = current_rule["action"]
+        
+        # Add target information
+        target = current_rule.get("target", {})
+        if isinstance(target, dict):
+            target_type = target.get("type")
+            target_value = target.get("value")
+            if target_type:
+                attributes["target_type"] = target_type
+            if target_value:
+                attributes["target_value"] = target_value
+            
+            # Add any other interesting target fields
+            for key, value in target.items():
+                if key not in ["type", "value"]:
+                    attributes[f"target_{key}"] = value
+        
+        # Add scope information
+        scope = current_rule.get("scope", {})
+        if isinstance(scope, dict):
+            scope_type = scope.get("type")
+            scope_value = scope.get("value")
+            if scope_type:
+                attributes["scope_type"] = scope_type
+            if scope_value:
+                attributes["scope_value"] = scope_value
+        
+        # Add direction if available
+        if "direction" in current_rule:
+            attributes["direction"] = current_rule["direction"]
+            
+        # Add disabled flag
+        if "disabled" in current_rule:
+            attributes[ATTR_RULE_DISABLED] = current_rule["disabled"]
+            
         # Add notes if available
         if "notes" in current_rule and current_rule["notes"]:
             attributes[ATTR_RULE_NOTES] = current_rule["notes"]
-        
+            
+        # Add timestamps
+        if "ts" in current_rule:
+            attributes["created_at"] = current_rule["ts"]
+        if "updateTs" in current_rule:
+            attributes["updated_at"] = current_rule["updateTs"]
         if "createdAt" in current_rule:
             attributes[ATTR_RULE_CREATED_TIME] = current_rule["createdAt"]
             
@@ -234,10 +278,12 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
             if self.coordinator.data and "rules" in self.coordinator.data:
                 for rule in self.coordinator.data["rules"]:
                     if isinstance(rule, dict) and rule.get("id") == self.rule_id:
-                        rule["paused"] = False
+                        rule["status"] = "active"  # Set status directly
+                        rule["paused"] = False     # Also set paused for backward compatibility
                         break
             
             # Also update our cached rule
+            self.rule["status"] = "active"
             self.rule["paused"] = False
             
             # Force state update
@@ -258,10 +304,12 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
             if self.coordinator.data and "rules" in self.coordinator.data:
                 for rule in self.coordinator.data["rules"]:
                     if isinstance(rule, dict) and rule.get("id") == self.rule_id:
-                        rule["paused"] = True
+                        rule["status"] = "paused"  # Set status directly
+                        rule["paused"] = True      # Also set paused for backward compatibility
                         break
             
             # Also update our cached rule
+            self.rule["status"] = "paused"
             self.rule["paused"] = True
             
             # Force state update
