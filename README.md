@@ -11,6 +11,8 @@ This custom component integrates your Firewalla device(s) with Home Assistant, a
 - View device information like model, version, mode, etc.
 - Control (pause/resume) Firewalla rules through Home Assistant
 - Use services to control Firewalla rules programmatically
+- Monitor network devices with upload/download statistics
+- View device groups and which rules apply to them
 
 ## Installation
 
@@ -31,7 +33,7 @@ This custom component integrates your Firewalla device(s) with Home Assistant, a
 
 ### Manual Installation
 
-1. Download the latest release from the [GitHub repository](https://github.com/yourusername/homeassistant-firewalla)
+1. Download the latest release from the [GitHub repository](https://github.com/joaopedrogoncalves/homeassistant-firewalla)
 2. Extract the contents to your Home Assistant config directory under `custom_components/firewalla`
 3. Restart Home Assistant
 

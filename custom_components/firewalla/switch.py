@@ -251,6 +251,12 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
                 attributes["scope_type"] = scope_type
             if scope_value:
                 attributes["scope_value"] = scope_value
+                
+            # If the scope is a group, add the group name
+            if scope_type == "group" and scope_value and self.coordinator.data and "device_groups" in self.coordinator.data:
+                group_name = self.coordinator.data["device_groups"].get(scope_value)
+                if group_name:
+                    attributes["group_name"] = group_name
         
         # Add direction if available
         if "direction" in current_rule:

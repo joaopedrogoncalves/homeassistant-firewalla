@@ -1,7 +1,7 @@
 """
 Home Assistant integration for Firewalla devices.
 For more information about this integration, please visit:
-https://github.com/joaopedrogoncalves/homeassistant-firewalla
+https://github.com/yourusername/homeassistant-firewalla
 """
 import logging
 import asyncio
@@ -156,6 +156,49 @@ class FirewallaAPI:
             _LOGGER.error("Exception in get_devices: %s", ex)
             return []
             
+    async def get_network_devices(self, device_gid=None):
+        """Get network devices from Firewalla."""
+        url = f"{self.base_url}/v2/devices"
+        if device_gid:
+            url = f"{url}?gid={device_gid}"
+            
+        _LOGGER.debug("Fetching network devices from: %s", url)
+            
+        try:
+            async with self.session.get(url, headers=self.headers) as response:
+                response_text = await response.text()
+                _LOGGER.debug("Network devices response status: %s", response.status)
+                
+                if response.status != 200:
+                    _LOGGER.error(
+                        "Error getting network devices: %s - %s",
+                        response.status,
+                        response_text,
+                    )
+                    return None
+                    
+                try:
+                    data = await response.json()
+                    device_count = len(data) if isinstance(data, list) else "unknown"
+                    _LOGGER.debug("Received %s network devices", device_count)
+                    
+                    # Log a sample of the data if available
+                    if isinstance(data, list) and len(data) > 0:
+                        _LOGGER.debug("Sample network device: %s", data[0])
+                    
+                    # Ensure we have a list
+                    if not isinstance(data, list):
+                        _LOGGER.error("Expected list of network devices but got: %s", type(data))
+                        return []
+                        
+                    return data
+                except Exception as ex:
+                    _LOGGER.error("Error parsing network devices response: %s - %s", ex, response_text[:200])
+                    return []
+        except Exception as ex:
+            _LOGGER.error("Exception in get_network_devices: %s", ex)
+            return []
+            
     async def get_rules(self, device_gid=None):
         """Get rules from Firewalla."""
         url = f"{self.base_url}/v2/rules"
@@ -303,6 +346,8 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
         self.api = api
         self.devices = []
         self.rules = []
+        self.network_devices = []
+        self.device_groups = {}  # Map group IDs to group names
 
     async def _async_update_data(self):
         """Fetch data from Firewalla."""
@@ -318,6 +363,30 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
                 raise UpdateFailed("Unexpected response format from API")
                 
             self.devices = devices
+            
+            # Get network devices
+            all_network_devices = []
+            for device in devices:
+                device_gid = device.get("gid")
+                if not device_gid:
+                    continue
+                    
+                network_devices = await self.api.get_network_devices(device_gid)
+                if network_devices:
+                    all_network_devices.extend(network_devices)
+            
+            self.network_devices = all_network_devices
+            
+            # Build a map of group IDs to group names
+            self.device_groups = {}
+            for device in all_network_devices:
+                if "group" in device and isinstance(device["group"], dict):
+                    group_id = device["group"].get("id")
+                    group_name = device["group"].get("name")
+                    if group_id and group_name:
+                        self.device_groups[group_id] = group_name
+            
+            _LOGGER.debug("Found device groups: %s", self.device_groups)
             
             # Get rules for all devices
             all_rules = []
@@ -338,7 +407,9 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
             
             return {
                 "devices": devices,
-                "rules": all_rules
+                "rules": all_rules,
+                "network_devices": all_network_devices,
+                "device_groups": self.device_groups
             }
         except Exception as ex:
             _LOGGER.error("Error updating Firewalla data: %s", ex)

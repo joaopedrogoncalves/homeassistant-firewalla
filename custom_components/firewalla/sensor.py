@@ -32,6 +32,7 @@ from .const import (
     ENTITY_RULE_COUNT,
     FIREWALLA_COORDINATOR,
 )
+from .network_device_sensor import async_setup_network_device_sensors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,6 +89,13 @@ async def async_setup_entry(
                          device_data.get("name", "unknown"), ex)
 
     async_add_entities(entities)
+    
+    # Set up network device sensors
+    try:
+        # This will be defined in the network_device_sensor.py file
+        await async_setup_network_device_sensors(hass, entry, async_add_entities)
+    except Exception as ex:
+        _LOGGER.error("Error setting up network device sensors: %s", ex)
 
 
 class FirewallaBaseSensor(CoordinatorEntity, SensorEntity):

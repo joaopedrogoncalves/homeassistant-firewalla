@@ -30,6 +30,7 @@ ENTITY_RULE_COUNT = "rule_count"
 ENTITY_ALARM_COUNT = "alarm_count"
 ENTITY_ONLINE = "online"
 ENTITY_RULE = "rule"
+ENTITY_NETWORK_DEVICE = "network_device"
 
 # Services
 SERVICE_PAUSE_RULE = "pause_rule"
