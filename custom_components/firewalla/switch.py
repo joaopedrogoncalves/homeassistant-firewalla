@@ -139,7 +139,7 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         # Determine icon based on action (allow/block)
         action = rule.get("action", "").lower()
         if action == "allow":
-            self._attr_icon = "mdi:check-circle-outline"
+            self._attr_icon = "mdi:checkbox-multiple-marked-circle"
         elif action == "block" or action == "deny":
             self._attr_icon = "mdi:block-helper"
         elif action == "timelimit":
