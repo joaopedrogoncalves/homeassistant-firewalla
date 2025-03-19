@@ -136,27 +136,61 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         safe_rule_id = self.rule_id.replace("-", "_")
         self._attr_unique_id = f"{self.device_gid}_{ENTITY_RULE}_{safe_rule_id}"
         
-        # Create a descriptive name based on the rule notes, or type and target
+        # Determine icon based on action (allow/block)
+        action = rule.get("action", "").lower()
+        if action == "allow":
+            self._attr_icon = "mdi:check-circle-outline"
+        elif action == "block" or action == "deny":
+            self._attr_icon = "mdi:block-helper"
+        else:
+            self._attr_icon = "mdi:shield"
+        
+        # Create a descriptive name based on the rule notes, group, or type and target
         rule_type = rule.get("type", "unknown")
         rule_target = rule.get("target", "unknown")
+        
+        # Get target value if it's a dictionary
         if isinstance(rule_target, dict):
             target_value = rule_target.get("value", "unknown")
             target_type = rule_target.get("type", "")
             if target_type and target_value:
-                rule_target_str = f"{target_type}: {target_value}"
+                target_str = f"{target_type}: {target_value}"
             else:
-                rule_target_str = target_value
+                target_str = target_value
         else:
-            rule_target_str = str(rule_target)
+            target_str = str(rule_target)
             
+        # Get notes and group information
         rule_notes = rule.get("notes", "")
         device_name = device_info.get("name", "Firewalla")
         
-        # Create name with notes if available
+        # Check for group name in scope
+        group_name = ""
+        scope = rule.get("scope", {})
+        if isinstance(scope, dict) and scope.get("type") == "group":
+            group_id = scope.get("value")
+            if group_id and coordinator.data and "device_groups" in coordinator.data:
+                group_name = coordinator.data["device_groups"].get(group_id, "")
+        
+        # Create name with the most descriptive information available
+        name_parts = []
+        
+        # Add notes if available, otherwise use target info
         if rule_notes:
-            self._attr_name = f"{device_name} Rule: {rule_notes}"
+            name_parts.append(rule_notes)
         else:
-            self._attr_name = f"{device_name} Rule: {rule_type} - {rule_target_str}"
+            if target_type == "category":
+                name_parts.append(f"category: {target_value}")
+            elif target_str and target_str != "unknown":
+                name_parts.append(target_str)
+        
+        # Add group name if available
+        if group_name:
+            name_parts.insert(0, f"group: {group_name}")
+            
+        # Construct final name
+        name = " - ".join(name_parts)
+        self._attr_name = f"Fw rule: {name}"
         
         # Set device info
         self._attr_device_info = DeviceInfo(
