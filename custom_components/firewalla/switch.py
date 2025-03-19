@@ -142,6 +142,8 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
             self._attr_icon = "mdi:check-circle-outline"
         elif action == "block" or action == "deny":
             self._attr_icon = "mdi:block-helper"
+        elif action == "timelimit":
+            self._attr_icon = "mdi:clock"
         else:
             self._attr_icon = "mdi:shield"
         
@@ -190,7 +192,7 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
             
         # Construct final name
         name = " - ".join(name_parts)
-        self._attr_name = f"Fw rule: {name}"
+        self._attr_name = f"Rule: {name}"
         
         # Set device info
         self._attr_device_info = DeviceInfo(
