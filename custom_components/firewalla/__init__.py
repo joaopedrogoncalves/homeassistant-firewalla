@@ -26,11 +26,17 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .api import FirewallaAPI
-from .const import DOMAIN, FIREWALLA_COORDINATOR, SERVICE_PAUSE_RULE, SERVICE_RESUME_RULE
+from .const import (
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    FIREWALLA_COORDINATOR,
+    SERVICE_PAUSE_RULE,
+    SERVICE_RESUME_RULE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(minutes=1)
+SCAN_INTERVAL = timedelta(seconds=DEFAULT_SCAN_INTERVAL)
 
 CONFIG_SCHEMA = vol.Schema(
     {
