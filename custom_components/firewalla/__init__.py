@@ -87,6 +87,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     # Register services
+    register_services(hass, api, coordinator)
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    return True
+
+
+def register_services(
+    hass: HomeAssistant, 
+    api: FirewallaAPI, 
+    coordinator: FirewallaDataUpdateCoordinator
+) -> None:
+    """Register integration services."""
+    
     async def pause_rule(call: ServiceCall) -> None:
         """Pause a rule."""
         rule_id = call.data.get("rule_id")
@@ -109,16 +123,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Register the services
     hass.services.async_register(
-        DOMAIN, SERVICE_PAUSE_RULE, pause_rule, vol.Schema({vol.Required("rule_id"): cv.string})
+        DOMAIN, 
+        SERVICE_PAUSE_RULE, 
+        pause_rule, 
+        vol.Schema({vol.Required("rule_id"): cv.string})
     )
     
     hass.services.async_register(
-        DOMAIN, SERVICE_RESUME_RULE, resume_rule, vol.Schema({vol.Required("rule_id"): cv.string})
+        DOMAIN, 
+        SERVICE_RESUME_RULE, 
+        resume_rule, 
+        vol.Schema({vol.Required("rule_id"): cv.string})
     )
-
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
