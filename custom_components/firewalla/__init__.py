@@ -3,13 +3,17 @@ Home Assistant integration for Firewalla devices.
 For more information about this integration, please visit:
 https://github.com/yourusername/homeassistant-firewalla
 """
+from __future__ import annotations
+
 import logging
 import asyncio
 from datetime import timedelta
+from typing import Any, Dict, List, Mapping, Optional
+
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.const import (
     CONF_API_KEY,
     CONF_HOST,
@@ -53,13 +57,13 @@ CONFIG_SCHEMA = vol.Schema(
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SWITCH]
 
 
-async def async_setup(hass: HomeAssistant, config: dict):
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Firewalla component."""
     hass.data.setdefault(DOMAIN, {})
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Firewalla from a config entry."""
     host = entry.data[CONF_HOST]
     api_key = entry.data[CONF_API_KEY]
@@ -83,7 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     }
 
     # Register services
-    async def pause_rule(call):
+    async def pause_rule(call: ServiceCall) -> None:
         """Pause a rule."""
         rule_id = call.data.get("rule_id")
         if not rule_id:
@@ -93,7 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         await api.pause_rule(rule_id)
         await coordinator.async_request_refresh()
     
-    async def resume_rule(call):
+    async def resume_rule(call: ServiceCall) -> None:
         """Resume a rule."""
         rule_id = call.data.get("rule_id")
         if not rule_id:
@@ -117,7 +121,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
@@ -125,10 +129,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     return unload_ok
 
 
-class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
+class FirewallaDataUpdateCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     """Class to manage fetching Firewalla data."""
 
-    def __init__(self, hass: HomeAssistant, api: FirewallaAPI):
+    def __init__(self, hass: HomeAssistant, api: FirewallaAPI) -> None:
         """Initialize the coordinator."""
         super().__init__(
             hass,
@@ -137,12 +141,12 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=SCAN_INTERVAL,
         )
         self.api = api
-        self.devices = []
-        self.rules = []
-        self.network_devices = []
-        self.device_groups = {}  # Map group IDs to group names
+        self.devices: List[Dict[str, Any]] = []
+        self.rules: List[Dict[str, Any]] = []
+        self.network_devices: List[Dict[str, Any]] = []
+        self.device_groups: Dict[str, str] = {}  # Map group IDs to group names
 
-    async def _async_update_data(self):
+    async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from Firewalla."""
         try:
             # Get devices first - this is critical for all other functionality
@@ -158,7 +162,7 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
             self.devices = devices
             
             # Get rules for all devices - this is critical for rule switches
-            all_rules = []
+            all_rules: List[Dict[str, Any]] = []
             for device in devices:
                 device_gid = device.get("gid")
                 if not device_gid:
@@ -175,7 +179,7 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
             self.rules = all_rules
             
             # Initial data structure with critical components
-            result = {
+            result: Dict[str, Any] = {
                 "devices": devices,
                 "rules": all_rules,
             }
@@ -183,7 +187,7 @@ class FirewallaDataUpdateCoordinator(DataUpdateCoordinator):
             # Try to get network devices, but don't fail if this part doesn't work
             # For now we're just collecting the data, but not creating entities from it
             try:
-                all_network_devices = []
+                all_network_devices: List[Dict[str, Any]] = []
                 for device in devices:
                     device_gid = device.get("gid")
                     if not device_gid:
