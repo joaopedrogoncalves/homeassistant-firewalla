@@ -11,7 +11,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .entity_base import FirewallaBaseEntity
+from .entity_base import FirewallaBaseEntity, FirewallaRuleEntity
 
 from .const import (
     ATTR_GID,
@@ -94,7 +94,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
+class FirewallaRuleSwitch(FirewallaRuleEntity, SwitchEntity):
     """Representation of a Firewalla rule switch."""
     
     _attr_icon = "mdi:shield"
@@ -103,38 +103,7 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
 
     def __init__(self, coordinator, rule, device_info):
         """Initialize the switch."""
-        super().__init__(coordinator)
-        self.rule = rule
-        
-        # Get rule ID, falling back to creating one if missing
-        if "id" in rule:
-            self.rule_id = rule["id"]
-        else:
-            # Create a synthetic ID based on other rule properties
-            rule_type = rule.get("type", "")
-            rule_target = rule.get("target", "unknown")
-            if isinstance(rule_target, dict):
-                target_value = rule_target.get("value", "unknown")
-            else:
-                target_value = str(rule_target)
-            self.rule_id = f"rule_{rule_type}_{target_value}".replace(" ", "_").lower()
-            _LOGGER.warning("Rule missing ID, created synthetic ID: %s", self.rule_id)
-            rule["id"] = self.rule_id
-            
-        # Get device GID, using the one from device_info if missing in rule
-        if "gid" in rule:
-            self.device_gid = rule["gid"]
-        else:
-            self.device_gid = device_info.get("gid", "unknown")
-            rule["gid"] = self.device_gid
-            _LOGGER.warning("Rule missing GID, using device GID: %s", self.device_gid)
-            
-        self.device_info = device_info
-        
-        # Create a unique ID based on the rule ID itself
-        # Replace hyphens with underscores for entity ID compatibility
-        safe_rule_id = self.rule_id.replace("-", "_")
-        self._attr_unique_id = f"{self.device_gid}_{ENTITY_RULE}_{safe_rule_id}"
+        super().__init__(coordinator, rule, device_info)
         
         # Determine icon based on action (allow/block)
         action = rule.get("action", "").lower()
@@ -208,15 +177,7 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
     def is_on(self) -> bool:
         """Return true if the rule is active (not paused)."""
         # First, check if there's an updated version of the rule in current data
-        current_rule = None
-        if self.coordinator.data and "rules" in self.coordinator.data:
-            for rule in self.coordinator.data["rules"]:
-                if not isinstance(rule, dict):
-                    continue
-                    
-                if rule.get("id") == self.rule_id:
-                    current_rule = rule
-                    break
+        current_rule = self.get_rule_data()
         
         if current_rule:
             # Check the status field first (seems to be what the API uses)
@@ -241,16 +202,7 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return additional attributes about the rule."""
         # Find the current rule data
-        current_rule = None
-        
-        if self.coordinator.data and "rules" in self.coordinator.data:
-            for rule in self.coordinator.data["rules"]:
-                if not isinstance(rule, dict):
-                    continue
-                    
-                if rule.get("id") == self.rule_id:
-                    current_rule = rule
-                    break
+        current_rule = self.get_rule_data()
                 
         if not current_rule:
             current_rule = self.rule
@@ -346,12 +298,10 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         
         if success:
             # Update local state immediately for faster UI feedback
-            if self.coordinator.data and "rules" in self.coordinator.data:
-                for rule in self.coordinator.data["rules"]:
-                    if isinstance(rule, dict) and rule.get("id") == self.rule_id:
-                        rule["status"] = "active"  # Set status directly
-                        rule["paused"] = False     # Also set paused for backward compatibility
-                        break
+            current_rule = self.get_rule_data()
+            if current_rule:
+                current_rule["status"] = "active"  # Set status directly
+                current_rule["paused"] = False     # Also set paused for backward compatibility
             
             # Also update our cached rule
             self.rule["status"] = "active"
@@ -372,12 +322,10 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         
         if success:
             # Update local state immediately for faster UI feedback
-            if self.coordinator.data and "rules" in self.coordinator.data:
-                for rule in self.coordinator.data["rules"]:
-                    if isinstance(rule, dict) and rule.get("id") == self.rule_id:
-                        rule["status"] = "paused"  # Set status directly
-                        rule["paused"] = True      # Also set paused for backward compatibility
-                        break
+            current_rule = self.get_rule_data()
+            if current_rule:
+                current_rule["status"] = "paused"  # Set status directly
+                current_rule["paused"] = True      # Also set paused for backward compatibility
             
             # Also update our cached rule
             self.rule["status"] = "paused"
@@ -391,29 +339,3 @@ class FirewallaRuleSwitch(CoordinatorEntity, SwitchEntity):
         else:
             _LOGGER.error("Failed to pause rule: %s", self.rule_id)
 
-    @property
-    def available(self) -> bool:
-        """Return if the entity is available."""
-        if not self.coordinator.last_update_success:
-            return False
-            
-        if not self.coordinator.data or "devices" not in self.coordinator.data:
-            return False
-            
-        # Check if the device is still available
-        device_available = False
-        for device in self.coordinator.data["devices"]:
-            if not isinstance(device, dict):
-                continue
-                
-            if device.get("gid") == self.device_gid and device.get("online", False):
-                device_available = True
-                break
-                
-        if not device_available:
-            return False
-            
-        # As long as the device is available, consider the rule available too
-        # No need to check if the rule still exists as we want to keep showing it
-        # even if it's temporarily not returned by the API
-        return True
