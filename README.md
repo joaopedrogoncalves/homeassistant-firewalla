@@ -114,7 +114,7 @@ logger:
 
 If you encounter any issues or have questions, please:
 
-1. Check the [GitHub Issues](https://github.com/yourusername/homeassistant-firewalla/issues) to see if your issue has been reported
+1. Check the [GitHub Issues](https://github.com/joaopedrogoncalves/homeassistant-firewalla/issues) to see if your issue has been reported
 2. If not, create a new issue with detailed information about the problem
 
 ## Contributing

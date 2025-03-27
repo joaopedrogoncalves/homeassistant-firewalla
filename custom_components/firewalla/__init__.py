@@ -1,7 +1,7 @@
 """
 Home Assistant integration for Firewalla devices.
 For more information about this integration, please visit:
-https://github.com/yourusername/homeassistant-firewalla
+https://github.com/joaopedrogoncalves/homeassistant-firewalla
 """
 from __future__ import annotations
 
