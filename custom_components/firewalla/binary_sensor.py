@@ -10,23 +10,14 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-)
 
 from .const import (
-    ATTR_GID,
-    ATTR_LICENSE,
-    ATTR_MODE,
-    ATTR_MODEL,
-    ATTR_PUBLIC_IP,
-    ATTR_VERSION,
     DOMAIN,
     ENTITY_ONLINE,
     FIREWALLA_COORDINATOR,
 )
+from .entity_base import FirewallaBaseEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,65 +59,21 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FirewallaOnlineSensor(CoordinatorEntity, BinarySensorEntity):
+class FirewallaOnlineSensor(FirewallaBaseEntity, BinarySensorEntity):
     """Representation of a Firewalla online status sensor."""
 
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     
     def __init__(self, coordinator, device_data):
         """Initialize the sensor."""
-        super().__init__(coordinator)
-        self.device_data = device_data
-        self.gid = device_data["gid"]
+        super().__init__(coordinator, device_data)
         self._attr_unique_id = f"{self.gid}_{ENTITY_ONLINE}"
         self._attr_name = f"{device_data['name']} Online"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.gid)},
-            name=device_data["name"],
-            manufacturer="Firewalla",
-            model=device_data["model"].capitalize(),
-            sw_version=device_data["version"],
-            configuration_url=f"https://my.firewalla.com/app/box/{self.gid}",
-        )
 
     @property
     def is_on(self) -> bool:
         """Return true if the Firewalla is online."""
-        for device in self.coordinator.data["devices"]:
-            if device["gid"] == self.gid:
-                return device["online"]
-        return False
-    
-    @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
-        """Return the extra state attributes of the entity."""
-        for device in self.coordinator.data["devices"]:
-            if device["gid"] == self.gid:
-                current_data = device
-                break
-        else:
-            return {}
-            
-        attributes = {
-            ATTR_GID: current_data["gid"],
-            ATTR_MODEL: current_data["model"],
-            ATTR_VERSION: current_data["version"],
-            ATTR_MODE: current_data["mode"],
-            ATTR_LICENSE: current_data["license"],
-        }
-
-        if "publicIP" in current_data:
-            attributes[ATTR_PUBLIC_IP] = current_data["publicIP"]
-            
-        return attributes
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        if not self.coordinator.last_update_success:
-            return False
-            
-        for device in self.coordinator.data["devices"]:
-            if device["gid"] == self.gid:
-                return True
+        device_data = self.get_device_data()
+        if device_data:
+            return device_data.get("online", False)
         return False

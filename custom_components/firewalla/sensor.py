@@ -12,26 +12,16 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-)
 
 from .const import (
-    ATTR_GID,
-    ATTR_LICENSE,
-    ATTR_LOCATION,
-    ATTR_MODE,
-    ATTR_MODEL,
-    ATTR_PUBLIC_IP,
-    ATTR_VERSION,
     DOMAIN,
     ENTITY_ALARM_COUNT,
     ENTITY_DEVICE_COUNT,
     ENTITY_RULE_COUNT,
     FIREWALLA_COORDINATOR,
 )
+from .entity_base import FirewallaBaseEntity
 
 # Remove this import since we'll handle network devices differently
 # from .network_device_sensor import async_setup_network_device_sensors
@@ -98,59 +88,8 @@ async def async_setup_entry(
 
 
 
-class FirewallaBaseSensor(CoordinatorEntity, SensorEntity):
+class FirewallaBaseSensor(FirewallaBaseEntity, SensorEntity):
     """Base class for Firewalla sensors."""
-
-    def __init__(self, coordinator, device_data):
-        """Initialize the sensor."""
-        super().__init__(coordinator)
-        self.device_data = device_data
-        self.gid = device_data["gid"]
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.gid)},
-            name=device_data["name"],
-            manufacturer="Firewalla",
-            model=device_data["model"].capitalize(),
-            sw_version=device_data["version"],
-            configuration_url=f"https://my.firewalla.com/app/box/{self.gid}",
-        )
-
-    @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
-        """Return the extra state attributes of the entity."""
-        for device in self.coordinator.data["devices"]:
-            if device["gid"] == self.gid:
-                current_data = device
-                break
-        else:
-            return {}
-            
-        attributes = {
-            ATTR_GID: current_data["gid"],
-            ATTR_MODEL: current_data["model"],
-            ATTR_VERSION: current_data["version"],
-            ATTR_MODE: current_data["mode"],
-            ATTR_LICENSE: current_data["license"],
-        }
-
-        if "publicIP" in current_data:
-            attributes[ATTR_PUBLIC_IP] = current_data["publicIP"]
-            
-        if "location" in current_data:
-            attributes[ATTR_LOCATION] = current_data["location"]
-            
-        return attributes
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        if not self.coordinator.last_update_success:
-            return False
-            
-        for device in self.coordinator.data["devices"]:
-            if device["gid"] == self.gid:
-                return True
-        return False
 
     async def async_update(self) -> None:
         """Update the sensor."""
@@ -173,9 +112,9 @@ class FirewallaDeviceCountSensor(FirewallaBaseSensor):
     @property
     def native_value(self) -> int:
         """Return the device count."""
-        for device in self.coordinator.data["devices"]:
-            if device["gid"] == self.gid:
-                return device["deviceCount"]
+        device_data = self.get_device_data()
+        if device_data:
+            return device_data.get("deviceCount", 0)
         return 0
 
 
@@ -195,9 +134,9 @@ class FirewallaRuleCountSensor(FirewallaBaseSensor):
     @property
     def native_value(self) -> int:
         """Return the rule count."""
-        for device in self.coordinator.data["devices"]:
-            if device["gid"] == self.gid:
-                return device["ruleCount"]
+        device_data = self.get_device_data()
+        if device_data:
+            return device_data.get("ruleCount", 0)
         return 0
 
 
@@ -217,7 +156,7 @@ class FirewallaAlarmCountSensor(FirewallaBaseSensor):
     @property
     def native_value(self) -> int:
         """Return the alarm count."""
-        for device in self.coordinator.data["devices"]:
-            if device["gid"] == self.gid:
-                return device["alarmCount"]
+        device_data = self.get_device_data()
+        if device_data:
+            return device_data.get("alarmCount", 0)
         return 0
